@@ -27,9 +27,9 @@ const ConfigFolderName = "kindle-send"
 var instance *config
 
 func isGmail(mail string) bool {
-	//use regex here
-	return strings.Contains(mail, "@gmail.com")
+	return strings.HasSuffix(strings.ToLower(mail), "@gmail.com")
 }
+
 func DefaultConfigPath() (string, error) {
 	user, err := user.Current()
 	if err != nil {
@@ -41,7 +41,6 @@ func DefaultConfigPath() (string, error) {
 	if len(xdgConfigHome) == 0 {
 		configFolder = path.Join(user.HomeDir, ".config")
 		configFolder = path.Join(configFolder, ConfigFolderName)
-		//util.Cyan.Println("Config home not set, will look for config at ", configFolder)
 	} else {
 		configFolder = path.Join(xdgConfigHome, ConfigFolderName)
 	}
@@ -49,6 +48,7 @@ func DefaultConfigPath() (string, error) {
 
 	return path.Join(configFolder, "KindleConfig.json"), nil
 }
+
 func exists(filename string) bool {
 	if _, err := os.Stat(filename); err != nil {
 		util.Red.Println(err)
@@ -56,18 +56,19 @@ func exists(filename string) bool {
 	}
 	return true
 }
+
 func NewConfig() *config {
 	config := config{}
 	config.Server = "smtp.gmail.com"
 	config.Port = 465
 	return &config
 }
-func CreateConfig() *config {
 
+func CreateConfig() *config {
 	util.CyanBold.Println("CONFIGURE KINDLE-SEND")
 
 	configuration := NewConfig()
-	util.Cyan.Printf("Email of your device and press enter (eg. purple_terminal@kindle.com) : ")
+	util.Cyan.Printf("Email of your device and press enter (eg. ryan@kindle.com) : ")
 	configuration.Receiver = util.ScanlineTrim()
 	util.Cyan.Printf("Email that'll be used to send documents to device (eg. yourname@gmail.com) : ")
 	configuration.Sender = util.ScanlineTrim()
@@ -118,6 +119,7 @@ func handleCreation(filename string) error {
 	util.Green.Printf("Config created successfully and stored at %s, you can directly edit it later on \n", filename)
 	return nil
 }
+
 func Load(filename string) (config, error) {
 	if !exists(filename) {
 		err := handleCreation(filename)

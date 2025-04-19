@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"slices"
+
 	"github.com/nikhil1raghav/kindle-send/types"
 )
 
@@ -26,8 +28,8 @@ func isUrlFile(u string) bool {
 	buf := make([]byte, 1024)
 	n, _ := file.Read(buf)
 	content := string(buf[:n])
-	lines := strings.Split(content, "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(content, "\n")
+	for line := range lines {
 		line = strings.Trim(line, " ")
 		if len(line) == 0 {
 			continue
@@ -46,12 +48,7 @@ func isBook(u string) bool {
 	if err != nil {
 		return false
 	}
-	for _, ext := range []string{".mobi", ".pdf", ".epub", ".azw3", ".txt"} {
-		if extension == ext {
-			return true
-		}
-	}
-	return false
+	return slices.Contains([]string{".mobi", ".pdf", ".epub", ".azw3", ".txt"}, extension)
 }
 
 func Classify(args []string) []types.Request {
