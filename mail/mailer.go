@@ -18,7 +18,7 @@ func Send(files []string, timeout int) {
 
 	msg.SetBody("text/plain", "")
 
-	attachedFiles:=make([]string,0)
+	attachedFiles := make([]string, 0)
 	for _, file := range files {
 		_, err := os.Stat(file)
 		if err != nil {
@@ -26,7 +26,7 @@ func Send(files []string, timeout int) {
 			continue
 		} else {
 			msg.Attach(file)
-			attachedFiles=append(attachedFiles,file)
+			attachedFiles = append(attachedFiles, file)
 		}
 	}
 	if len(attachedFiles) == 0 {
@@ -35,12 +35,12 @@ func Send(files []string, timeout int) {
 	}
 
 	dialer := gomail.NewDialer(cfg.Server, cfg.Port, cfg.Sender, cfg.Password)
-	dialer.Timeout=time.Duration(timeout)*time.Second
+	dialer.Timeout = time.Duration(timeout) * time.Second
 	util.CyanBold.Println("Sending mail")
 	util.Cyan.Println("Mail timeout : ", dialer.Timeout.String())
 	util.Cyan.Println("Following files will be sent :")
-	for i,file:=range attachedFiles{
-		util.Cyan.Printf("%d. %s\n",i+1,file)
+	for i, file := range attachedFiles {
+		util.Cyan.Printf("%d. %s\n", i+1, file)
 	}
 
 	if err := dialer.DialAndSend(msg); err != nil {

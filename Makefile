@@ -20,7 +20,7 @@ linux:
 	 upx -7 ${DIST_DIR}/kindle-send-linux-arm-${VERSION}
 
 
-#not packing windows binary, defender flags upx packed binary as trojan :( 
+#not packing windows binary, defender flags upx packed binary as trojan :(
 windows:
 	CGO=0 GOOS=windows GOARCH=amd64 go build -ldflags '${LDFLAGS}' -o ${DIST_DIR}/kindle-send-windows-64bit-${VERSION}.exe ./main.go
 	CGO=0 GOOS=windows GOARCH=386 go build -ldflags '${LDFLAGS}' -o ${DIST_DIR}/kindle-send-windows-32bit-${VERSION}.exe ./main.go

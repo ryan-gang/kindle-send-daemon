@@ -26,7 +26,7 @@ func Scanline() string {
 	return ""
 }
 
-//Scan input and trim
+// Scan input and trim
 func ScanlineTrim() string {
 	return strings.TrimSpace(Scanline())
 }
