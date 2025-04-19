@@ -1,5 +1,10 @@
 package magic
 
+import (
+	"bytes"
+	"encoding/binary"
+)
+
 var (
 	// Odt matches an OpenDocument Text file.
 	Odt = offset([]byte("mimetypeapplication/vnd.oasis.opendocument.text"), 30)
@@ -37,9 +42,87 @@ func Zip(raw []byte, limit uint32) bool {
 
 // Jar matches a Java archive file.
 func Jar(raw []byte, limit uint32) bool {
-	t := zipTokenizer{in: raw}
-	for i, tok := 0, t.next(); i < 10 && tok != ""; i, tok = i+1, t.next() {
-		if tok == "META-INF/MANIFEST.MF" {
+	return zipContains(raw, []byte("META-INF/MANIFEST.MF"), false)
+}
+
+func zipContains(raw, sig []byte, msoCheck bool) bool {
+	b := readBuf(raw)
+	pk := []byte("PK\003\004")
+	if len(b) < 0x1E {
+		return false
+	}
+
+	if !b.advance(0x1E) {
+		return false
+	}
+	if bytes.HasPrefix(b, sig) {
+		return true
+	}
+
+	if msoCheck {
+		skipFiles := [][]byte{
+			[]byte("[Content_Types].xml"),
+			[]byte("_rels/.rels"),
+			[]byte("docProps"),
+			[]byte("customXml"),
+			[]byte("[trash]"),
+		}
+
+		hasSkipFile := false
+		for _, sf := range skipFiles {
+			if bytes.HasPrefix(b, sf) {
+				hasSkipFile = true
+				break
+			}
+		}
+		if !hasSkipFile {
+			return false
+		}
+	}
+
+	searchOffset := binary.LittleEndian.Uint32(raw[18:]) + 49
+	if !b.advance(int(searchOffset)) {
+		return false
+	}
+
+	nextHeader := bytes.Index(raw[searchOffset:], pk)
+	if !b.advance(nextHeader) {
+		return false
+	}
+	if bytes.HasPrefix(b, sig) {
+		return true
+	}
+
+	for i := 0; i < 4; i++ {
+		if !b.advance(0x1A) {
+			return false
+		}
+		nextHeader = bytes.Index(b, pk)
+		if nextHeader == -1 {
+			return false
+		}
+		if !b.advance(nextHeader + 0x1E) {
+			return false
+		}
+		if bytes.HasPrefix(b, sig) {
+			return true
+		}
+	}
+	return false
+}
+
+// APK matches an Android Package Archive.
+// The source of signatures is https://github.com/file/file/blob/1778642b8ba3d947a779a36fcd81f8e807220a19/magic/Magdir/archive#L1820-L1887
+func APK(raw []byte, _ uint32) bool {
+	apkSignatures := [][]byte{
+		[]byte("AndroidManifest.xml"),
+		[]byte("META-INF/com/android/build/gradle/app-metadata.properties"),
+		[]byte("classes.dex"),
+		[]byte("resources.arsc"),
+		[]byte("res/drawable"),
+	}
+	for _, sig := range apkSignatures {
+		if zipContains(raw, sig, false) {
 			return true
 		}
 	}

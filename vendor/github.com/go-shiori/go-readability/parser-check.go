@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/go-shiori/dom"
+	"github.com/go-shiori/go-readability/internal/re2go"
 	"golang.org/x/net/html"
 )
 
@@ -23,6 +24,8 @@ func (ps *Parser) Check(input io.Reader) bool {
 // CheckDocument checks whether the document is readable without parsing the whole thing.
 func (ps *Parser) CheckDocument(doc *html.Node) bool {
 	// Get <p> and <pre> nodes.
+	nodes := dom.QuerySelectorAll(doc, "p, pre, article")
+
 	// Also get <div> nodes which have <br> node(s) and append
 	// them into the `nodes` variable.
 	// Some articles' DOM structures might look like :
@@ -35,44 +38,29 @@ func (ps *Parser) CheckDocument(doc *html.Node) bool {
 	//
 	// So we need to make sure only fetch the div once.
 	// To do so, we will use map as dictionary.
-	nodeList := make([]*html.Node, 0)
-	nodeDict := make(map[*html.Node]struct{})
-	var finder func(*html.Node)
-
-	finder = func(node *html.Node) {
-		if node.Type == html.ElementNode {
-			tag := dom.TagName(node)
-			if tag == "p" || tag == "pre" {
-				if _, exist := nodeDict[node]; !exist {
-					nodeList = append(nodeList, node)
-					nodeDict[node] = struct{}{}
-				}
-			} else if tag == "br" && node.Parent != nil && dom.TagName(node.Parent) == "div" {
-				if _, exist := nodeDict[node.Parent]; !exist {
-					nodeList = append(nodeList, node.Parent)
-					nodeDict[node.Parent] = struct{}{}
-				}
-			}
+	tracker := make(map[*html.Node]struct{})
+	for _, br := range dom.QuerySelectorAll(doc, "div > br") {
+		if br.Parent == nil {
+			continue
 		}
 
-		for child := node.FirstChild; child != nil; child = child.NextSibling {
-			finder(child)
+		if _, exist := tracker[br.Parent]; !exist {
+			tracker[br.Parent] = struct{}{}
+			nodes = append(nodes, br.Parent)
 		}
 	}
-
-	finder(doc)
 
 	// This is a little cheeky, we use the accumulator 'score' to decide what
 	// to return from this callback.
 	score := float64(0)
-	return ps.someNode(nodeList, func(node *html.Node) bool {
+	return ps.someNode(nodes, func(node *html.Node) bool {
 		if !ps.isProbablyVisible(node) {
 			return false
 		}
 
 		matchString := dom.ClassName(node) + " " + dom.ID(node)
-		if rxUnlikelyCandidates.MatchString(matchString) &&
-			!rxOkMaybeItsACandidate.MatchString(matchString) {
+		if re2go.IsUnlikelyCandidates(matchString) &&
+			!re2go.MaybeItsACandidate(matchString) {
 			return false
 		}
 
@@ -81,16 +69,12 @@ func (ps *Parser) CheckDocument(doc *html.Node) bool {
 		}
 
 		nodeText := strings.TrimSpace(dom.TextContent(node))
-		nodeTextLength := charCount(nodeText)
+		nodeTextLength := len(nodeText)
 		if nodeTextLength < 140 {
 			return false
 		}
 
 		score += math.Sqrt(float64(nodeTextLength - 140))
-		if score > 20 {
-			return true
-		}
-
-		return false
+		return score > 20
 	})
 }
