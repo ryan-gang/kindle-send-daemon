@@ -9,7 +9,7 @@ import (
 )
 
 var Red = color.New(color.FgRed)
-var RedBold = color.New(color.FgRed).Add(color.Bold)
+var _ = color.New(color.FgRed).Add(color.Bold)
 var Cyan = color.New(color.FgCyan)
 var CyanBold = color.New(color.FgCyan).Add(color.Bold)
 var Green = color.New(color.FgGreen)
@@ -26,7 +26,7 @@ func Scanline() string {
 	return ""
 }
 
-// Scan input and trim
+// ScanlineTrim : Scans input and trims
 func ScanlineTrim() string {
 	return strings.TrimSpace(Scanline())
 }

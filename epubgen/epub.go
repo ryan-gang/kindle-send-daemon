@@ -112,12 +112,12 @@ func (e *epubmaker) addContent(articles *[]readability.Article) error {
 	}
 	util.Green.Printf("Added %d articles\n", added)
 	if added == 0 {
-		return errors.New("No article was added, epub creation failed")
+		return errors.New("no article was added, epub creation failed")
 	}
 	return nil
 }
 
-// Generates a single epub from a slice of urls, returns file path
+// Make : Generates a single epub from a slice of urls, returns file path
 func Make(pageUrls []string, title string) (string, error) {
 	//TODO: Parallelize fetching pages
 
@@ -135,7 +135,7 @@ func Make(pageUrls []string, title string) (string, error) {
 	}
 
 	if len(readableArticles) == 0 {
-		return "", errors.New("No readable url given, exiting without creating epub")
+		return "", errors.New("no readable url given, exiting without creating epub")
 	}
 
 	if len(title) == 0 {

@@ -2,9 +2,8 @@ package config
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"os"
-	user2 "os/user"
+	"os/user"
 	"path"
 	"strconv"
 	"strings"
@@ -32,7 +31,7 @@ func isGmail(mail string) bool {
 	return strings.Contains(mail, "@gmail.com")
 }
 func DefaultConfigPath() (string, error) {
-	user, err := user2.Current()
+	user, err := user.Current()
 	if err != nil {
 		util.Red.Println("Couldn't get current user ", err)
 		os.Exit(1)
@@ -126,7 +125,7 @@ func Load(filename string) (config, error) {
 			return config{}, err
 		}
 	}
-	data, err := ioutil.ReadFile(filename)
+	data, err := os.ReadFile(filename)
 	if err != nil {
 		util.Red.Println("Error reading config ", err)
 		return config{}, err
@@ -153,7 +152,7 @@ func Save(c config, filename string) error {
 		util.Red.Println("Error parsing configuration for writing")
 		return err
 	}
-	return ioutil.WriteFile(filename, data, 0644)
+	return os.WriteFile(filename, data, 0644)
 }
 
 func InitializeConfig(c *config) {

@@ -1,11 +1,11 @@
-<p align = "center">
+<p>
 <img src="assets/kindle-send-small.png" width="40%">
 </p>
 
-<p align = "center">
+<p>
 <strong>Send blogs, documents, collection of webpages to your kindle</strong>
 </p>
-<h3 align="center">
+<h3>
 <a href="#contribute">Contribute</a>
 <span> · </span>
 <a href="#documentation">Documentation</a>
@@ -22,7 +22,7 @@
 Webpages are optimized for viewing on e-reader
 
 
-<p align = "center">
+<p>
 <figure>
 <img width="90%" src="assets/toepub.png">
 <figcaption>Credits - Netflix tech blog<a href="https://netflixtechblog.com/fixing-performance-regressions-before-they-happen-eab2602b86fe">Fixing Performance Regressions Before they Happen</a></figcaption>
@@ -87,7 +87,7 @@ Using `kindle-send` to mail an already existing file.
 kindle-send send Jane-eyre-Autobiography.epub
 ```
 
-<p align="center">
+<p>
   <img width="100%" src="assets/sendfile-new.svg">
 </p>
 
@@ -100,7 +100,7 @@ Quickly send a webpage to kindle
 kindle-send send http://paulgraham.com/hwh.html
 ```
 
-<p align="center">
+<p>
   <img width="100%" src="assets/sendurl-new.svg">
 </p>
 
@@ -114,7 +114,7 @@ bound in a single ebook as chapters and sent to ereader.
 kindle-send send links.txt
 ```
 
-<p align="center">
+<p>
   <img width="100%" src="assets/send-link-file-new.svg">
 </p>
 
@@ -146,7 +146,7 @@ Example
 kindle-send download https://blog.maxgio.me/posts/linux-scheduler-journey/
 ```
 
-<p align="center">
+<p>
   <img width="100%" src="assets/download-new.svg">
 </p>
 
@@ -179,5 +179,3 @@ Feel free to create an issue and then working on some feature, so that we don't 
 - [x] Option to download but not send the files
 - [x] Remove dependency on percollate and calibre
 - [x] Make installation easier, add brew and other package managers.
-
-
