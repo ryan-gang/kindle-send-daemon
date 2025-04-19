@@ -1,9 +1,17 @@
 package epubgen
 
 import (
+	"bytes"
 	"errors"
+	"image"
+	"image/jpeg"
+	"image/png"
+	"io"
+	"net/http"
 	"os"
 	"path"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -45,30 +53,114 @@ func (e *epubmaker) changeRefs(i int, img *goquery.Selection) {
 	}
 }
 
+// compressImage compresses the image data based on its type
+func compressImage(imgData []byte, imgURL string) ([]byte, error) {
+	// Determine image type from URL or content
+	imgType := strings.ToLower(filepath.Ext(imgURL))
+
+	// Decode the image
+	img, format, err := image.Decode(bytes.NewReader(imgData))
+	if err != nil {
+		return nil, err
+	}
+
+	var buf bytes.Buffer
+
+	// Compress based on format
+	if format == "jpeg" || imgType == ".jpg" || imgType == ".jpeg" {
+		// JPEG quality settings (0-100), 85 is a good balance
+		err = jpeg.Encode(&buf, img, &jpeg.Options{Quality: 85})
+	} else if format == "png" || imgType == ".png" {
+		// For PNG, using default compression
+		encoder := png.Encoder{CompressionLevel: png.DefaultCompression}
+		err = encoder.Encode(&buf, img)
+	} else {
+		// For other formats, just return the original data
+		return imgData, nil
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
+}
+
 // Download images and add to epub zip
 func (e *epubmaker) downloadImages(i int, img *goquery.Selection) {
 	util.CyanBold.Println("Downloading Images")
 	imgSrc, exists := img.Attr("src")
 
 	if exists {
-
-		//don't download same thing twice
+		// don't download same thing twice
 		if _, ok := e.downloads[imgSrc]; ok {
 			return
 		}
 
-		//pass unique and safe image names here, then it will not crash on windows
-		//use murmur hash to generate file name
+		// pass unique and safe image names here, then it will not crash on windows
+		// use murmur hash to generate file name
 		imageFileName := util.GetHash(imgSrc)
 
-		imgRef, err := e.Epub.AddImage(imgSrc, imageFileName)
+		// Download the image data first
+		resp, err := http.Get(imgSrc)
+		if err != nil {
+			util.Red.Printf("Couldn't download image %s: %s\n", imgSrc, err)
+			return
+		}
+		defer resp.Body.Close()
+
+		// Read the image data
+		imgData, err := io.ReadAll(resp.Body)
+		if err != nil {
+			util.Red.Printf("Error reading image data from %s: %s\n", imgSrc, err)
+			return
+		}
+
+		// Compress the image
+		compressedImgData, err := compressImage(imgData, imgSrc)
+		if err != nil {
+			util.Red.Printf("Error compressing image %s: %s\n", imgSrc, err)
+			// Fallback to original image if compression fails
+			compressedImgData = imgData
+		} else {
+			originalSize := len(imgData)
+			compressedSize := len(compressedImgData)
+			reduction := float64(originalSize-compressedSize) / float64(originalSize) * 100
+			util.Green.Printf("Image %s compressed: %d KB → %d KB (%.1f%% reduction)\n",
+				filepath.Base(imgSrc), originalSize/1024, compressedSize/1024, reduction)
+		}
+
+		// Create a temp file for the compressed image
+		tempFile, err := os.CreateTemp("", "kindle-send-img-*"+filepath.Ext(imageFileName))
+		if err != nil {
+			util.Red.Printf("Couldn't create temp file for image %s: %s\n", imgSrc, err)
+			return
+		}
+		defer tempFile.Close()
+
+		// Write compressed data to temp file
+		if _, err := tempFile.Write(compressedImgData); err != nil {
+			util.Red.Printf("Error writing to temp file for image %s: %s\n", imgSrc, err)
+			os.Remove(tempFile.Name())
+			return
+		}
+
+		// Create a custom URL for the temp file to use with AddImage
+		tempFileURL := "file://" + tempFile.Name()
+
+		// Add the compressed image to epub using the URL approach
+		imgRef, err := e.Epub.AddImage(tempFileURL, imageFileName)
 		if err != nil {
 			util.Red.Printf("Couldn't add image %s : %s\n", imgSrc, err)
+			os.Remove(tempFile.Name())
 			return
-		} else {
-			util.Green.Printf("Downloaded image %s\n", imgSrc)
-			e.downloads[imgSrc] = imgRef
 		}
+
+		// Clean up temp file after it's added to the epub
+		defer os.Remove(tempFile.Name())
+
+		util.Green.Printf("Downloaded and compressed image %s\n", imgSrc)
+		e.downloads[imgSrc] = imgRef
 	}
 }
 
@@ -76,7 +168,7 @@ func (e *epubmaker) downloadImages(i int, img *goquery.Selection) {
 func (e *epubmaker) embedImages(wg *sync.WaitGroup, article *readability.Article) {
 	util.Cyan.Println("Embedding images in ", article.Title)
 	defer wg.Done()
-	//TODO: Compress images before embedding to improve size
+	// Compression is now handled in downloadImages function
 	doc := goquery.NewDocumentFromNode(article.Node)
 
 	//download all images
