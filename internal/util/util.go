@@ -21,7 +21,12 @@ func Scanline() string {
 	if scanner.Scan() {
 		return scanner.Text()
 	}
-	color.Red("\nInterrupted")
+	// Check for scanner error
+	if err := scanner.Err(); err != nil {
+		color.Red("\nScanner error: %v", err)
+	} else {
+		color.Red("\nInput interrupted")
+	}
 	os.Exit(1)
 	return ""
 }
