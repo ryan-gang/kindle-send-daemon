@@ -54,6 +54,8 @@ func (d *Daemon) Start() error {
 	}
 	defer logger.Close()
 
+	// Bookmark system is now initialized within BookmarkProcessor
+
 	if err := d.writePidFile(); err != nil {
 		return fmt.Errorf("failed to write PID file: %v", err)
 	}

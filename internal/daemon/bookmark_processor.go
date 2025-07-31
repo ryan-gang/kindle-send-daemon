@@ -1,16 +1,17 @@
 package daemon
 
 import (
-	"bufio"
+	"context"
 	"crypto/md5"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 	"time"
 
+	"github.com/ryan-gang/kindle-send-daemon/internal/bookmarks"
+	"github.com/ryan-gang/kindle-send-daemon/internal/bookmarks/providers"
 	"github.com/ryan-gang/kindle-send-daemon/internal/classifier"
 	"github.com/ryan-gang/kindle-send-daemon/internal/config"
 	"github.com/ryan-gang/kindle-send-daemon/internal/handler"
@@ -29,18 +30,73 @@ type ProcessedState struct {
 	LastCheck time.Time           `json:"last_check"`
 }
 
+// FileProviderAdapter adapts the providers.FileProvider to the bookmarks.Provider interface
+type FileProviderAdapter struct {
+	provider *providers.FileProvider
+}
+
+func (fpa *FileProviderAdapter) Name() string {
+	return fpa.provider.Name()
+}
+
+func (fpa *FileProviderAdapter) IsEnabled() bool {
+	return fpa.provider.IsEnabled()
+}
+
+func (fpa *FileProviderAdapter) Configure(config map[string]interface{}) error {
+	return fpa.provider.Configure(config)
+}
+
+func (fpa *FileProviderAdapter) GetBookmarks(ctx context.Context) ([]bookmarks.Bookmark, error) {
+	providerBookmarks, err := fpa.provider.GetBookmarks(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert from providers.Bookmark to bookmarks.Bookmark
+	var bookmarkList []bookmarks.Bookmark
+	for _, pb := range providerBookmarks {
+		bookmarkList = append(bookmarkList, bookmarks.Bookmark{
+			URL:       pb.URL,
+			Title:     pb.Title,
+			Source:    pb.Source,
+			Timestamp: pb.Timestamp,
+		})
+	}
+
+	return bookmarkList, nil
+}
+
 type BookmarkProcessor struct {
 	statePath string
 	state     ProcessedState
+	registry  *bookmarks.Registry
 }
 
 func NewBookmarkProcessor() *BookmarkProcessor {
 	cfg := config.GetInstance()
 	statePath := filepath.Join(filepath.Dir(cfg.PidFile), "processed_bookmarks.json")
 
+	// Create registry and register providers
+	registry := bookmarks.NewRegistry()
+
+	// Register file provider
+	fileProvider := providers.NewFileProvider()
+	fileAdapter := &FileProviderAdapter{provider: fileProvider}
+	registry.Register(fileAdapter)
+
+	// Configure file provider if bookmark path is set
+	if cfg.BookmarkPath != "" {
+		providerConfig := map[string]interface{}{
+			"path": cfg.BookmarkPath,
+		}
+		fileAdapter.Configure(providerConfig)
+	}
+
 	processor := &BookmarkProcessor{
 		statePath: statePath,
 		state:     ProcessedState{Bookmarks: make([]ProcessedBookmark, 0)},
+		registry:  registry,
 	}
 
 	processor.loadState()
@@ -48,73 +104,35 @@ func NewBookmarkProcessor() *BookmarkProcessor {
 }
 
 func (bp *BookmarkProcessor) ReadBookmarks() ([]string, error) {
-	cfg := config.GetInstance()
-	bookmarkPath := cfg.BookmarkPath
+	ctx := context.Background()
+	providers := bp.registry.GetEnabled()
 
-	info, err := os.Stat(bookmarkPath)
-	if err != nil {
-		return nil, fmt.Errorf("bookmark path does not exist: %v", err)
+	if len(providers) == 0 {
+		return nil, fmt.Errorf("no enabled bookmark providers")
 	}
 
-	var allBookmarks []string
+	var allBookmarks []bookmarks.Bookmark
 
-	if info.IsDir() {
-		files, err := os.ReadDir(bookmarkPath)
+	// Collect bookmarks from all providers
+	for _, provider := range providers {
+		bookmarkList, err := provider.GetBookmarks(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("error reading bookmark directory: %v", err)
-		}
-
-		for _, file := range files {
-			if file.IsDir() {
-				continue
-			}
-
-			filePath := filepath.Join(bookmarkPath, file.Name())
-			bookmarks, err := bp.readBookmarkFile(filePath)
-			if err != nil {
-				util.Red.Printf("Error reading file %s: %v\n", filePath, err)
-				continue
-			}
-			allBookmarks = append(allBookmarks, bookmarks...)
-		}
-	} else {
-		bookmarks, err := bp.readBookmarkFile(bookmarkPath)
-		if err != nil {
-			return nil, fmt.Errorf("error reading bookmark file: %v", err)
-		}
-		allBookmarks = bookmarks
-	}
-
-	newBookmarks := bp.filterNewBookmarks(allBookmarks)
-	return newBookmarks, nil
-}
-
-func (bp *BookmarkProcessor) readBookmarkFile(filePath string) ([]string, error) {
-	file, err := os.Open(filePath)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	var bookmarks []string
-	scanner := bufio.NewScanner(file)
-
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" || strings.HasPrefix(line, "#") {
+			logger.Errorf("Error getting bookmarks from provider %s: %v", provider.Name(), err)
+			util.Red.Printf("Error getting bookmarks from provider %s: %v\n", provider.Name(), err)
 			continue
 		}
-
-		if strings.HasPrefix(line, "http://") || strings.HasPrefix(line, "https://") {
-			bookmarks = append(bookmarks, line)
-		}
+		allBookmarks = append(allBookmarks, bookmarkList...)
 	}
 
-	if err := scanner.Err(); err != nil {
-		return nil, err
+	// Convert bookmarks to URL strings for backward compatibility
+	var urls []string
+	for _, bookmark := range allBookmarks {
+		urls = append(urls, bookmark.URL)
 	}
 
-	return bookmarks, nil
+	// Filter out already processed bookmarks
+	newBookmarks := bp.filterNewBookmarks(urls)
+	return newBookmarks, nil
 }
 
 func (bp *BookmarkProcessor) filterNewBookmarks(bookmarks []string) []string {
