@@ -13,11 +13,11 @@ func init() {
 	var configPath string
 	configPath, err := config.DefaultConfigPath()
 	if err != nil {
-		util.Red.Println("Error setting default config path: ", err)
-		os.Exit(1)
+		// Use a fallback path if default config path fails
+		configPath = "~/.config/kindle-send/KindleConfig.json"
+		util.Red.Printf("Warning: could not determine default config path (%v), using fallback: %s\n", err, configPath)
 	}
 	rootCmd.PersistentFlags().StringVarP(&configPath, "config", "c", configPath, "Path to config file")
-
 }
 
 var rootCmd = &cobra.Command{

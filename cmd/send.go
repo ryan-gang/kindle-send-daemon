@@ -3,9 +3,8 @@ package cmd
 import (
 	"github.com/lithammer/dedent"
 	"github.com/ryan-gang/kindle-send-daemon/internal/classifier"
-	"github.com/ryan-gang/kindle-send-daemon/internal/config"
+	"github.com/ryan-gang/kindle-send-daemon/internal/cmdutil"
 	"github.com/ryan-gang/kindle-send-daemon/internal/handler"
-	"github.com/ryan-gang/kindle-send-daemon/internal/util"
 	"github.com/spf13/cobra"
 )
 
@@ -41,10 +40,8 @@ var sendCmd = &cobra.Command{
 	Long:    helpLong,
 	Example: helpExample,
 	Run: func(cmd *cobra.Command, args []string) {
-		configPath, _ := cmd.Flags().GetString("config")
-		_, err := config.Load(configPath)
-		if err != nil {
-			util.Red.Println(err)
+		cfg := cmdutil.LoadConfigOrExit(cmd)
+		if cfg == nil {
 			return
 		}
 

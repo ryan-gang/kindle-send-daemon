@@ -23,9 +23,13 @@ bookmark monitoring path, and check intervals.`,
 
 		if _, err := os.Stat(configPath); err != nil {
 			util.CyanBold.Println("Creating new configuration...")
-			cfg := config.CreateConfig()
+			cfg, err := config.CreateConfig()
+			if err != nil {
+				util.LogError(util.ConfigError, "creating configuration", err)
+				os.Exit(1)
+			}
 			if err := config.Save(*cfg, configPath); err != nil {
-				util.Red.Printf("Error saving configuration: %v\n", err)
+				util.LogError(util.ConfigError, "saving configuration", err)
 				os.Exit(1)
 			}
 			util.Green.Printf("Configuration saved to %s\n", configPath)
@@ -33,7 +37,7 @@ bookmark monitoring path, and check intervals.`,
 			util.CyanBold.Println("Updating existing configuration...")
 			cfg, err := config.Load(configPath)
 			if err != nil {
-				util.Red.Printf("Error loading configuration: %v\n", err)
+				util.LogError(util.ConfigError, "loading configuration", err)
 				os.Exit(1)
 			}
 
@@ -67,7 +71,7 @@ bookmark monitoring path, and check intervals.`,
 
 				// Save updated config
 				if err := config.Save(cfg, configPath); err != nil {
-					util.Red.Printf("Error saving configuration: %v\n", err)
+					util.LogError(util.ConfigError, "saving updated configuration", err)
 					os.Exit(1)
 				}
 

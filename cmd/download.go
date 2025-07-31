@@ -5,7 +5,7 @@ import (
 
 	"github.com/lithammer/dedent"
 	"github.com/ryan-gang/kindle-send-daemon/internal/classifier"
-	"github.com/ryan-gang/kindle-send-daemon/internal/config"
+	"github.com/ryan-gang/kindle-send-daemon/internal/cmdutil"
 	"github.com/ryan-gang/kindle-send-daemon/internal/handler"
 	"github.com/ryan-gang/kindle-send-daemon/internal/util"
 	"github.com/spf13/cobra"
@@ -38,10 +38,8 @@ var downloadCmd = &cobra.Command{
 	Long:    helpDownload,
 	Example: exampleDownload,
 	Run: func(cmd *cobra.Command, args []string) {
-		configPath, _ := cmd.Flags().GetString("config")
-		_, err := config.Load(configPath)
-		if err != nil {
-			util.Red.Println(err)
+		cfg := cmdutil.LoadConfigOrExit(cmd)
+		if cfg == nil {
 			return
 		}
 
@@ -50,7 +48,11 @@ var downloadCmd = &cobra.Command{
 
 		util.CyanBold.Printf("Downloaded %d files :\n", len(downloadRequests))
 		for idx, req := range downloadedRequests {
-			fileInfo, _ := os.Stat(req.Path)
+			fileInfo, err := os.Stat(req.Path)
+			if err != nil {
+				util.Red.Printf("Error getting file info for %s: %v\n", req.Path, err)
+				continue
+			}
 			util.Cyan.Printf("%d. %s\n", idx+1, fileInfo.Name())
 		}
 
