@@ -19,29 +19,63 @@ type Daemon struct {
 	cancel    context.CancelFunc
 	ticker    *time.Ticker
 	processor *BookmarkProcessor
+	cfg       config.ConfigProvider
+	logger    logger.LoggerInterface
 }
 
-func NewDaemon() *Daemon {
+func NewDaemon(cfg config.ConfigProvider) (*Daemon, error) {
 	ctx, cancel := context.WithCancel(context.Background())
+
+	// Create logger instance
+	loggerInstance, err := logger.NewLogger(cfg)
+	if err != nil {
+		cancel() // Ensure cancel is called on error path
+		return nil, fmt.Errorf("failed to create logger: %w", err)
+	}
+
+	processor, err := NewBookmarkProcessor(cfg, loggerInstance)
+	if err != nil {
+		cancel() // Ensure cancel is called on error path
+		return nil, fmt.Errorf("failed to create bookmark processor: %w", err)
+	}
 
 	return &Daemon{
 		ctx:       ctx,
 		cancel:    cancel,
-		processor: NewBookmarkProcessor(),
-	}
+		processor: processor,
+		cfg:       cfg,
+		logger:    loggerInstance,
+	}, nil
 }
 
 func (d *Daemon) Start() error {
-	cfg := config.GetInstance()
-	if cfg == nil {
-		return fmt.Errorf("configuration not loaded")
+	if err := d.validateConfiguration(); err != nil {
+		return err
 	}
 
-	if !cfg.DaemonEnabled {
+	if err := d.initializeServices(); err != nil {
+		return err
+	}
+	defer d.logger.Close()
+
+	sigChan := d.setupSignalHandling()
+	d.setupTicker()
+	d.logStartupInfo()
+	d.processBookmarks()
+
+	return d.runEventLoop(sigChan)
+}
+
+func (d *Daemon) validateConfiguration() error {
+	if d.cfg == nil {
+		return fmt.Errorf("configuration not provided")
+	}
+
+	if !d.cfg.IsDaemonEnabled() {
 		return fmt.Errorf("daemon is not enabled in configuration")
 	}
 
-	if cfg.BookmarkPath == "" {
+	if d.cfg.GetBookmarkPath() == "" {
 		return fmt.Errorf("bookmark path is not configured")
 	}
 
@@ -49,48 +83,54 @@ func (d *Daemon) Start() error {
 		return fmt.Errorf("daemon is already running")
 	}
 
-	if err := logger.Init(); err != nil {
-		return fmt.Errorf("failed to initialize logger: %v", err)
-	}
-	defer logger.Close()
+	return nil
+}
 
-	// Bookmark system is now initialized within BookmarkProcessor
-
+func (d *Daemon) initializeServices() error {
 	if err := d.writePidFile(); err != nil {
 		return fmt.Errorf("failed to write PID file: %v", err)
 	}
 
+	return nil
+}
+
+func (d *Daemon) setupSignalHandling() chan os.Signal {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	return sigChan
+}
 
-	interval := time.Duration(cfg.CheckInterval) * time.Minute
+func (d *Daemon) setupTicker() {
+	interval := time.Duration(d.cfg.GetCheckInterval()) * time.Minute
 	d.ticker = time.NewTicker(interval)
+}
 
-	util.GreenBold.Printf("Kindle-send daemon started, checking bookmarks every %d minutes\n", cfg.CheckInterval)
-	util.Cyan.Printf("Monitoring bookmark path: %s\n", cfg.BookmarkPath)
-	util.Cyan.Printf("PID file: %s\n", cfg.PidFile)
-	util.Cyan.Printf("Log file: %s\n", cfg.LogPath)
+func (d *Daemon) logStartupInfo() {
+	util.GreenBold.Printf("Kindle-send daemon started, checking bookmarks every %d minutes\n", d.cfg.GetCheckInterval())
+	util.Cyan.Printf("Monitoring bookmark path: %s\n", d.cfg.GetBookmarkPath())
+	util.Cyan.Printf("PID file: %s\n", d.cfg.GetPidFile())
+	util.Cyan.Printf("Log file: %s\n", d.cfg.GetLogPath())
 
-	logger.Infof("Daemon started with PID %d", os.Getpid())
-	logger.Infof("Monitoring bookmark path: %s", cfg.BookmarkPath)
-	logger.Infof("Check interval: %d minutes", cfg.CheckInterval)
+	d.logger.Infof("Daemon started with PID %d", os.Getpid())
+	d.logger.Infof("Monitoring bookmark path: %s", d.cfg.GetBookmarkPath())
+	d.logger.Infof("Check interval: %d minutes", d.cfg.GetCheckInterval())
+}
 
-	d.processBookmarks()
-
+func (d *Daemon) runEventLoop(sigChan chan os.Signal) error {
 	for {
 		select {
 		case <-d.ctx.Done():
-			logger.Info("Daemon context cancelled")
+			d.logger.Info("Daemon context cancelled")
 			util.Cyan.Println("Daemon context cancelled")
 			d.cleanup()
 			return nil
 		case sig := <-sigChan:
-			logger.Infof("Received signal: %v", sig)
+			d.logger.Infof("Received signal: %v", sig)
 			util.Cyan.Printf("Received signal: %v\n", sig)
 			d.Stop()
 			return nil
 		case <-d.ticker.C:
-			logger.Info("Starting bookmark check cycle")
+			d.logger.Info("Starting bookmark check cycle")
 			util.Cyan.Printf("Checking bookmarks at %s\n", time.Now().Format("2006-01-02 15:04:05"))
 			d.processBookmarks()
 		}
@@ -98,7 +138,7 @@ func (d *Daemon) Start() error {
 }
 
 func (d *Daemon) Stop() {
-	logger.Info("Stopping daemon...")
+	d.logger.Info("Stopping daemon...")
 	util.Cyan.Println("Stopping daemon...")
 
 	if d.ticker != nil {
@@ -108,53 +148,52 @@ func (d *Daemon) Stop() {
 	d.cancel()
 	d.cleanup()
 
-	logger.Info("Daemon stopped successfully")
+	d.logger.Info("Daemon stopped successfully")
 	util.Green.Println("Daemon stopped successfully")
 }
 
 func (d *Daemon) processBookmarks() {
 	if d.processor == nil {
-		logger.Error("Bookmark processor not initialized")
+		d.logger.Error("Bookmark processor not initialized")
 		util.Red.Println("Bookmark processor not initialized")
 		return
 	}
 
 	bookmarks, err := d.processor.ReadBookmarks()
 	if err != nil {
-		logger.Errorf("Error reading bookmarks: %v", err)
+		d.logger.Errorf("Error reading bookmarks: %v", err)
 		util.Red.Printf("Error reading bookmarks: %v\n", err)
 		return
 	}
 
 	if len(bookmarks) == 0 {
-		logger.Info("No new bookmarks found")
+		d.logger.Info("No new bookmarks found")
 		util.Cyan.Println("No new bookmarks found")
 		return
 	}
 
-	logger.Infof("Found %d new bookmarks to process", len(bookmarks))
+	d.logger.Infof("Found %d new bookmarks to process", len(bookmarks))
 	util.CyanBold.Printf("Found %d new bookmarks to process\n", len(bookmarks))
 
 	processed, err := d.processor.ProcessBookmarks(bookmarks)
 	if err != nil {
-		logger.Errorf("Error processing bookmarks: %v", err)
+		d.logger.Errorf("Error processing bookmarks: %v", err)
 		util.Red.Printf("Error processing bookmarks: %v\n", err)
 		return
 	}
 
 	if len(processed) > 0 {
-		logger.Infof("Successfully processed and sent %d bookmarks", len(processed))
+		d.logger.Infof("Successfully processed and sent %d bookmarks", len(processed))
 		util.GreenBold.Printf("Successfully processed and sent %d bookmarks\n", len(processed))
 	}
 }
 
 func (d *Daemon) isRunning() bool {
-	cfg := config.GetInstance()
-	if cfg.PidFile == "" {
+	if d.cfg.GetPidFile() == "" {
 		return false
 	}
 
-	pidData, err := os.ReadFile(cfg.PidFile)
+	pidData, err := os.ReadFile(d.cfg.GetPidFile())
 	if err != nil {
 		return false
 	}
@@ -175,26 +214,22 @@ func (d *Daemon) isRunning() bool {
 }
 
 func (d *Daemon) writePidFile() error {
-	cfg := config.GetInstance()
 	pid := os.Getpid()
-	return os.WriteFile(cfg.PidFile, []byte(strconv.Itoa(pid)), 0644)
+	return os.WriteFile(d.cfg.GetPidFile(), []byte(strconv.Itoa(pid)), 0644)
 }
 
 func (d *Daemon) cleanup() {
-	cfg := config.GetInstance()
-	if cfg.PidFile != "" {
-		os.Remove(cfg.PidFile)
+	if d.cfg.GetPidFile() != "" {
+		os.Remove(d.cfg.GetPidFile())
 	}
 }
 
 func (d *Daemon) Status() error {
-	cfg := config.GetInstance()
-
 	if d.isRunning() {
-		pidData, _ := os.ReadFile(cfg.PidFile)
+		pidData, _ := os.ReadFile(d.cfg.GetPidFile())
 		util.Green.Printf("Daemon is running (PID: %s)\n", string(pidData))
-		util.Cyan.Printf("Bookmark path: %s\n", cfg.BookmarkPath)
-		util.Cyan.Printf("Check interval: %d minutes\n", cfg.CheckInterval)
+		util.Cyan.Printf("Bookmark path: %s\n", d.cfg.GetBookmarkPath())
+		util.Cyan.Printf("Check interval: %d minutes\n", d.cfg.GetCheckInterval())
 		return nil
 	} else {
 		util.Red.Println("Daemon is not running")

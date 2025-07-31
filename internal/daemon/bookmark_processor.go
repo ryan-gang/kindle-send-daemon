@@ -16,6 +16,7 @@ import (
 	"github.com/ryan-gang/kindle-send-daemon/internal/config"
 	"github.com/ryan-gang/kindle-send-daemon/internal/handler"
 	"github.com/ryan-gang/kindle-send-daemon/internal/logger"
+	"github.com/ryan-gang/kindle-send-daemon/internal/types"
 	"github.com/ryan-gang/kindle-send-daemon/internal/util"
 )
 
@@ -36,11 +37,12 @@ type BookmarkProcessor struct {
 	statePath string
 	state     ProcessedState
 	registry  *bookmarks.Registry
+	cfg       config.ConfigProvider
+	logger    logger.LoggerInterface
 }
 
-func NewBookmarkProcessor() *BookmarkProcessor {
-	cfg := config.GetInstance()
-	statePath := filepath.Join(filepath.Dir(cfg.PidFile), "processed_bookmarks.json")
+func NewBookmarkProcessor(cfg config.ConfigProvider, logger logger.LoggerInterface) (*BookmarkProcessor, error) {
+	statePath := filepath.Join(filepath.Dir(cfg.GetPidFile()), "processed_bookmarks.json")
 
 	// Create registry and register providers
 	registry := bookmarks.NewRegistry()
@@ -50,9 +52,9 @@ func NewBookmarkProcessor() *BookmarkProcessor {
 	registry.Register(fileProvider)
 
 	// Configure file provider if bookmark path is set
-	if cfg.BookmarkPath != "" {
+	if cfg.GetBookmarkPath() != "" {
 		providerConfig := map[string]interface{}{
-			"path": cfg.BookmarkPath,
+			"path": cfg.GetBookmarkPath(),
 		}
 		fileProvider.Configure(providerConfig)
 	}
@@ -61,10 +63,12 @@ func NewBookmarkProcessor() *BookmarkProcessor {
 		statePath: statePath,
 		state:     ProcessedState{Bookmarks: make([]ProcessedBookmark, 0)},
 		registry:  registry,
+		cfg:       cfg,
+		logger:    logger,
 	}
 
 	processor.loadState()
-	return processor
+	return processor, nil
 }
 
 func (bp *BookmarkProcessor) ReadBookmarks() ([]string, error) {
@@ -81,7 +85,7 @@ func (bp *BookmarkProcessor) ReadBookmarks() ([]string, error) {
 	for _, provider := range providers {
 		bookmarkList, err := provider.GetBookmarks(ctx)
 		if err != nil {
-			logger.Errorf("Error getting bookmarks from provider %s: %v", provider.Name(), err)
+			bp.logger.Errorf("Error getting bookmarks from provider %s: %v", provider.Name(), err)
 			util.Red.Printf("Error getting bookmarks from provider %s: %v\n", provider.Name(), err)
 			continue
 		}
@@ -127,33 +131,58 @@ func (bp *BookmarkProcessor) ProcessBookmarks(bookmarks []string) ([]string, err
 		return []string{}, nil
 	}
 
-	downloadRequests := classifier.Classify(bookmarks)
-	if len(downloadRequests) == 0 {
-		logger.Info("No valid bookmarks to process")
-		util.Cyan.Println("No valid bookmarks to process")
-		return []string{}, nil
+	downloadedRequests, err := bp.downloadBookmarks(bookmarks)
+	if err != nil {
+		return nil, err
 	}
 
-	logger.Infof("Classified %d bookmarks for processing", len(downloadRequests))
+	if err := bp.sendBookmarksViaEmail(downloadedRequests); err != nil {
+		return nil, err
+	}
+
+	processedBookmarks := bp.updateProcessedState(bookmarks)
+	bp.cleanupOldBookmarks()
+
+	if err := bp.saveState(); err != nil {
+		util.Red.Printf("Warning: failed to save processed state: %v\n", err)
+	}
+
+	return processedBookmarks, nil
+}
+
+func (bp *BookmarkProcessor) downloadBookmarks(bookmarks []string) ([]types.Request, error) {
+	downloadRequests := classifier.Classify(bookmarks)
+	if len(downloadRequests) == 0 {
+		bp.logger.Info("No valid bookmarks to process")
+		util.Cyan.Println("No valid bookmarks to process")
+		return nil, fmt.Errorf("no valid bookmarks to process")
+	}
+
+	bp.logger.Infof("Classified %d bookmarks for processing", len(downloadRequests))
 
 	downloadedRequests := handler.Queue(downloadRequests)
 	if len(downloadedRequests) == 0 {
-		logger.Warn("No bookmarks were successfully downloaded")
+		bp.logger.Warn("No bookmarks were successfully downloaded")
 		util.Cyan.Println("No bookmarks were successfully downloaded")
-		return []string{}, nil
+		return nil, fmt.Errorf("no bookmarks were successfully downloaded")
 	}
 
-	logger.Infof("Successfully downloaded %d bookmarks", len(downloadedRequests))
+	bp.logger.Infof("Successfully downloaded %d bookmarks", len(downloadedRequests))
+	return downloadedRequests, nil
+}
 
-	cfg := config.GetInstance()
-	timeout := cfg.CheckInterval * 60
+func (bp *BookmarkProcessor) sendBookmarksViaEmail(downloadedRequests []types.Request) error {
+	timeout := bp.cfg.GetCheckInterval() * 60
 	if timeout < 60 {
 		timeout = config.DefaultTimeout
 	}
 
-	logger.Infof("Sending %d bookmarks via email with timeout %d seconds", len(downloadedRequests), timeout)
+	bp.logger.Infof("Sending %d bookmarks via email with timeout %d seconds", len(downloadedRequests), timeout)
 	handler.Mail(downloadedRequests, timeout)
+	return nil
+}
 
+func (bp *BookmarkProcessor) updateProcessedState(bookmarks []string) []string {
 	var processedBookmarks []string
 	now := time.Now()
 
@@ -168,19 +197,16 @@ func (bp *BookmarkProcessor) ProcessBookmarks(bookmarks []string) ([]string, err
 	}
 
 	bp.state.LastCheck = now
+	return processedBookmarks
+}
 
+func (bp *BookmarkProcessor) cleanupOldBookmarks() {
 	if len(bp.state.Bookmarks) > 1000 {
 		sort.Slice(bp.state.Bookmarks, func(i, j int) bool {
 			return bp.state.Bookmarks[i].Timestamp.After(bp.state.Bookmarks[j].Timestamp)
 		})
 		bp.state.Bookmarks = bp.state.Bookmarks[:1000]
 	}
-
-	if err := bp.saveState(); err != nil {
-		util.Red.Printf("Warning: failed to save processed state: %v\n", err)
-	}
-
-	return processedBookmarks, nil
 }
 
 func (bp *BookmarkProcessor) loadState() {
