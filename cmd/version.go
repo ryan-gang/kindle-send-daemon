@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"github.com/nikhil1raghav/kindle-send/util"
+	"github.com/nikhil1raghav/kindle-send/internal/util"
 	"github.com/spf13/cobra"
 )
 

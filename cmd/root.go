@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/nikhil1raghav/kindle-send/config"
-	"github.com/nikhil1raghav/kindle-send/util"
+	"github.com/nikhil1raghav/kindle-send/internal/config"
+	"github.com/nikhil1raghav/kindle-send/internal/util"
 	"github.com/spf13/cobra"
 )
 

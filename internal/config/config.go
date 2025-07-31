@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/nikhil1raghav/kindle-send/util"
+	"github.com/nikhil1raghav/kindle-send/internal/util"
 )
 
 type config struct {
