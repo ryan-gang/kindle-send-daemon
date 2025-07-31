@@ -3,9 +3,9 @@ package cmd
 import (
 	"os"
 
-	"github.com/nikhil1raghav/kindle-send/internal/config"
-	"github.com/nikhil1raghav/kindle-send/internal/daemon"
-	"github.com/nikhil1raghav/kindle-send/internal/util"
+	"github.com/ryan-gang/kindle-send-daemon/internal/config"
+	"github.com/ryan-gang/kindle-send-daemon/internal/daemon"
+	"github.com/ryan-gang/kindle-send-daemon/internal/util"
 	"github.com/spf13/cobra"
 )
 

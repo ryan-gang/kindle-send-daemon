@@ -1,11 +1,11 @@
 package handler
 
 import (
-	"github.com/nikhil1raghav/kindle-send/internal/config"
-	"github.com/nikhil1raghav/kindle-send/internal/epubgen"
-	"github.com/nikhil1raghav/kindle-send/internal/mail"
-	"github.com/nikhil1raghav/kindle-send/internal/types"
-	"github.com/nikhil1raghav/kindle-send/internal/util"
+	"github.com/ryan-gang/kindle-send-daemon/internal/config"
+	"github.com/ryan-gang/kindle-send-daemon/internal/epubgen"
+	"github.com/ryan-gang/kindle-send-daemon/internal/mail"
+	"github.com/ryan-gang/kindle-send-daemon/internal/types"
+	"github.com/ryan-gang/kindle-send-daemon/internal/util"
 )
 
 func Queue(downloadRequests []types.Request) []types.Request {

@@ -9,9 +9,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/nikhil1raghav/kindle-send/internal/config"
-	"github.com/nikhil1raghav/kindle-send/internal/logger"
-	"github.com/nikhil1raghav/kindle-send/internal/util"
+	"github.com/ryan-gang/kindle-send-daemon/internal/config"
+	"github.com/ryan-gang/kindle-send-daemon/internal/logger"
+	"github.com/ryan-gang/kindle-send-daemon/internal/util"
 )
 
 type Daemon struct {

@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/nikhil1raghav/kindle-send/internal/config"
+	"github.com/ryan-gang/kindle-send-daemon/internal/config"
 )
 
 type LogLevel int

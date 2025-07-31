@@ -1,4 +1,4 @@
-module github.com/nikhil1raghav/kindle-send
+module github.com/ryan-gang/kindle-send-daemon
 
 go 1.24
 

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/nikhil1raghav/kindle-send/internal/config"
-	"github.com/nikhil1raghav/kindle-send/internal/util"
+	"github.com/ryan-gang/kindle-send-daemon/internal/config"
+	"github.com/ryan-gang/kindle-send-daemon/internal/util"
 	"github.com/spf13/cobra"
 )
 
@@ -32,7 +32,7 @@ The daemon monitors a configured bookmark file/folder and automatically:
 - Sends the converted content to your ereader via email
 - Keeps track of processed bookmarks to avoid duplicates
 
-Complete documentation is available at https://github.com/nikhil1raghav/kindle-send`,
+Complete documentation is available at https://github.com/ryan-gang/kindle-send-daemon`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// Show help if no command is provided
 		cmd.Help()

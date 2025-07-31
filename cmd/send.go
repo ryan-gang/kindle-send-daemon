@@ -2,10 +2,10 @@ package cmd
 
 import (
 	"github.com/lithammer/dedent"
-	"github.com/nikhil1raghav/kindle-send/internal/classifier"
-	"github.com/nikhil1raghav/kindle-send/internal/config"
-	"github.com/nikhil1raghav/kindle-send/internal/handler"
-	"github.com/nikhil1raghav/kindle-send/internal/util"
+	"github.com/ryan-gang/kindle-send-daemon/internal/classifier"
+	"github.com/ryan-gang/kindle-send-daemon/internal/config"
+	"github.com/ryan-gang/kindle-send-daemon/internal/handler"
+	"github.com/ryan-gang/kindle-send-daemon/internal/util"
 	"github.com/spf13/cobra"
 )
 
@@ -15,7 +15,7 @@ func init() {
 
 var (
 	helpLong = `Sends the files to ereader. If a link or a file containing links is given
-it will first download the webpage, convert into ebook and then send. 
+it will first download the webpage, convert into ebook and then send.
 Each argument is sent as a separate file.
 kindle-send auto detects if argument is a link, collection of links or an ebook.`
 

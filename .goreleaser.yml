@@ -10,7 +10,7 @@ builds:
     flags:
       - -mod=vendor
     ldflags:
-      - -s -w -X github.com/nikhil1raghav/kindle-send/util.version={{.Version}} -X github.com/nikhil1raghav/kindle-send/util.buildDate={{.Date}}
+      - -s -w -X github.com/ryan-gang/kindle-send-daemon/util.version={{.Version}} -X github.com/ryan-gang/kindle-send-daemon/util.buildDate={{.Date}}
 
 changelog:
   sort: 'asc'

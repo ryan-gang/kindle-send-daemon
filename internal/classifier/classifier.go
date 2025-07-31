@@ -7,7 +7,7 @@ import (
 
 	"slices"
 
-	"github.com/nikhil1raghav/kindle-send/internal/types"
+	"github.com/ryan-gang/kindle-send-daemon/internal/types"
 )
 
 func isUrl(u string) bool {
