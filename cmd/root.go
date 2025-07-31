@@ -22,18 +22,20 @@ func init() {
 
 var rootCmd = &cobra.Command{
 	Use:   "kindle-send",
-	Short: "kindle-send sends documents, webpages and books to your ereader",
-	Long: `kindle-send is a CLI tool to send file (books/documents) and webpages to your ereader
-It parses the webpage, optimizes it for reading on ereader, and then converts
-into an ebook. Then it emails the ebook to the ereader.
+	Short: "Background daemon for sending documents and webpages to your ereader",
+	Long: `kindle-send is a background daemon that continuously monitors bookmark files
+and automatically sends new content to your ereader. It can also be used for
+one-time sending of files, documents, and webpages.
+
+The daemon monitors a configured bookmark file/folder and automatically:
+- Downloads webpages and converts them to ebooks
+- Sends the converted content to your ereader via email
+- Keeps track of processed bookmarks to avoid duplicates
+
 Complete documentation is available at https://github.com/nikhil1raghav/kindle-send`,
 	Run: func(cmd *cobra.Command, args []string) {
-		configPath, _ := cmd.Flags().GetString("config")
-		_, err := config.Load(configPath)
-		if err != nil {
-			util.Red.Println(err)
-			return
-		}
+		// Show help if no command is provided
+		cmd.Help()
 	},
 }
 
