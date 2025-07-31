@@ -18,6 +18,12 @@ type config struct {
 	Password  string `json:"password"`
 	Server    string `json:"server"`
 	Port      int    `json:"port"`
+
+	BookmarkPath  string `json:"bookmark_path"`
+	CheckInterval int    `json:"check_interval_minutes"`
+	DaemonEnabled bool   `json:"daemon_enabled"`
+	LogPath       string `json:"log_path"`
+	PidFile       string `json:"pid_file"`
 }
 
 const DefaultTimeout = 120
@@ -49,6 +55,28 @@ func DefaultConfigPath() (string, error) {
 	return path.Join(configFolder, "KindleConfig.json"), nil
 }
 
+func SetDaemonDefaults(c *config) error {
+	if c.LogPath == "" {
+		configPath, err := DefaultConfigPath()
+		if err != nil {
+			return err
+		}
+		configDir := path.Dir(configPath)
+		c.LogPath = path.Join(configDir, "kindle-send.log")
+	}
+
+	if c.PidFile == "" {
+		configPath, err := DefaultConfigPath()
+		if err != nil {
+			return err
+		}
+		configDir := path.Dir(configPath)
+		c.PidFile = path.Join(configDir, "kindle-send.pid")
+	}
+
+	return nil
+}
+
 func exists(filename string) bool {
 	if _, err := os.Stat(filename); err != nil {
 		util.Red.Println(err)
@@ -61,6 +89,12 @@ func NewConfig() *config {
 	config := config{}
 	config.Server = "smtp.gmail.com"
 	config.Port = 465
+
+	config.CheckInterval = 15
+	config.DaemonEnabled = false
+	config.BookmarkPath = ""
+	config.LogPath = ""
+	config.PidFile = ""
 	return &config
 }
 
@@ -98,6 +132,21 @@ func CreateConfig() *config {
 
 	util.Cyan.Printf("File path to store all the documents on your computer (empty is ok) :")
 	configuration.StorePath = util.ScanlineTrim()
+
+	util.CyanBold.Println("\nDAEMON CONFIGURATION")
+	util.Cyan.Printf("Path to bookmark file/folder to monitor (empty to disable daemon) :")
+	configuration.BookmarkPath = util.ScanlineTrim()
+	if configuration.BookmarkPath != "" {
+		configuration.DaemonEnabled = true
+		util.Cyan.Printf("Check interval in minutes (default 15) :")
+		intervalStr := util.ScanlineTrim()
+		if intervalStr != "" {
+			if interval, err := strconv.Atoi(intervalStr); err == nil && interval > 0 {
+				configuration.CheckInterval = interval
+			}
+		}
+	}
+
 	encryptedPass, err := Encrypt(configuration.Sender, configuration.Password)
 	if err != nil {
 		util.Red.Println("Error encrypting password ", err)
@@ -144,6 +193,12 @@ func Load(filename string) (config, error) {
 		os.Exit(1)
 	}
 	c.Password = decryptedPass
+
+	if err := SetDaemonDefaults(&c); err != nil {
+		util.Red.Println("Error setting daemon defaults: ", err)
+		return config{}, err
+	}
+
 	InitializeConfig(&c)
 	return c, nil
 }
