@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/user"
 	"path"
@@ -39,8 +40,7 @@ func isGmail(mail string) bool {
 func DefaultConfigPath() (string, error) {
 	user, err := user.Current()
 	if err != nil {
-		util.Red.Println("Couldn't get current user ", err)
-		os.Exit(1)
+		return "", fmt.Errorf("couldn't get current user: %w", err)
 	}
 	xdgConfigHome := os.Getenv(XdgConfigHome)
 	var configFolder string
@@ -50,7 +50,9 @@ func DefaultConfigPath() (string, error) {
 	} else {
 		configFolder = path.Join(xdgConfigHome, ConfigFolderName)
 	}
-	_ = os.Mkdir(configFolder, os.ModePerm)
+	if err := os.MkdirAll(configFolder, os.ModePerm); err != nil {
+		return "", fmt.Errorf("failed to create config directory: %w", err)
+	}
 
 	return path.Join(configFolder, "KindleConfig.json"), nil
 }
@@ -98,7 +100,7 @@ func NewConfig() *config {
 	return &config
 }
 
-func CreateConfig() *config {
+func CreateConfig() (*config, error) {
 	util.CyanBold.Println("CONFIGURE KINDLE-SEND")
 
 	configuration := NewConfig()
@@ -149,24 +151,34 @@ func CreateConfig() *config {
 
 	encryptedPass, err := Encrypt(configuration.Sender, configuration.Password)
 	if err != nil {
-		util.Red.Println("Error encrypting password ", err)
-		os.Exit(1)
+		return nil, fmt.Errorf("error encrypting password: %w", err)
 	}
 	configuration.Password = encryptedPass
 
-	return configuration
+	return configuration, nil
 }
 
 func handleCreation(filename string) error {
 	util.Red.Println("Configuration file doesn't exist\n Answer next few questions to create config file")
-	configuration := CreateConfig()
-	err := Save(*configuration, filename)
+	configuration, err := CreateConfig()
+	if err != nil {
+		return fmt.Errorf("failed to create configuration: %w", err)
+	}
+	err = Save(*configuration, filename)
 	if err != nil {
 		util.Red.Println("Error while writing config to ", filename, err)
 		return err
 	}
 	util.Green.Printf("Config created successfully and stored at %s, you can directly edit it later on \n", filename)
 	return nil
+}
+
+func LoadProvider(filename string) (ConfigProvider, error) {
+	cfg, err := Load(filename)
+	if err != nil {
+		return nil, err
+	}
+	return NewConfigProvider(&cfg), nil
 }
 
 func Load(filename string) (config, error) {
@@ -189,8 +201,7 @@ func Load(filename string) (config, error) {
 	}
 	decryptedPass, err := Decrypt(c.Sender, c.Password)
 	if err != nil {
-		util.Red.Println("Error decrypting password : ", err)
-		os.Exit(1)
+		return config{}, fmt.Errorf("error decrypting password: %w", err)
 	}
 	c.Password = decryptedPass
 
