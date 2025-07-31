@@ -43,5 +43,12 @@ func Mail(mailRequests []types.Request, timeout int) {
 	if timeout < 60 {
 		timeout = config.DefaultTimeout
 	}
-	mail.Send(filePaths, timeout)
+	// Use config singleton for backward compatibility
+	cfg := config.GetInstance()
+	if cfg != nil {
+		mailSender := mail.NewSMTPMailSender(config.NewConfigProvider(cfg))
+		if err := mailSender.Send(filePaths, timeout); err != nil {
+			util.Red.Printf("Failed to send mail: %v\n", err)
+		}
+	}
 }
