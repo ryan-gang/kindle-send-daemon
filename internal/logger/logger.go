@@ -27,87 +27,83 @@ type Logger struct {
 	file        *os.File
 }
 
-var instance *Logger
-
-func Init() error {
-	cfg := config.GetInstance()
+func (l *Logger) Init(cfg config.ConfigProvider) error {
 	if cfg == nil {
-		return fmt.Errorf("config not initialized")
+		return fmt.Errorf("config not provided")
 	}
 
-	logDir := filepath.Dir(cfg.LogPath)
+	logDir := filepath.Dir(cfg.GetLogPath())
 	if err := os.MkdirAll(logDir, 0755); err != nil {
 		return fmt.Errorf("failed to create log directory: %v", err)
 	}
 
-	file, err := os.OpenFile(cfg.LogPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	file, err := os.OpenFile(cfg.GetLogPath(), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
 		return fmt.Errorf("failed to open log file: %v", err)
 	}
 
 	multiWriter := io.MultiWriter(file, os.Stdout)
 
-	instance = &Logger{
-		infoLogger:  log.New(multiWriter, "INFO:  ", log.Ldate|log.Ltime|log.Lshortfile),
-		warnLogger:  log.New(multiWriter, "WARN:  ", log.Ldate|log.Ltime|log.Lshortfile),
-		errorLogger: log.New(multiWriter, "ERROR: ", log.Ldate|log.Ltime|log.Lshortfile),
-		debugLogger: log.New(multiWriter, "DEBUG: ", log.Ldate|log.Ltime|log.Lshortfile),
-		file:        file,
-	}
+	l.infoLogger = log.New(multiWriter, "INFO:  ", log.Ldate|log.Ltime|log.Lshortfile)
+	l.warnLogger = log.New(multiWriter, "WARN:  ", log.Ldate|log.Ltime|log.Lshortfile)
+	l.errorLogger = log.New(multiWriter, "ERROR: ", log.Ldate|log.Ltime|log.Lshortfile)
+	l.debugLogger = log.New(multiWriter, "DEBUG: ", log.Ldate|log.Ltime|log.Lshortfile)
+	l.file = file
 
 	return nil
 }
 
-func Close() {
-	if instance != nil && instance.file != nil {
-		instance.file.Close()
+func (l *Logger) Close() error {
+	if l.file != nil {
+		return l.file.Close()
+	}
+	return nil
+}
+
+func (l *Logger) Info(v ...any) {
+	if l.infoLogger != nil {
+		l.infoLogger.Println(v...)
 	}
 }
 
-func Info(v ...any) {
-	if instance != nil {
-		instance.infoLogger.Println(v...)
+func (l *Logger) Infof(format string, v ...any) {
+	if l.infoLogger != nil {
+		l.infoLogger.Printf(format, v...)
 	}
 }
 
-func Infof(format string, v ...any) {
-	if instance != nil {
-		instance.infoLogger.Printf(format, v...)
+func (l *Logger) Warn(v ...any) {
+	if l.warnLogger != nil {
+		l.warnLogger.Println(v...)
 	}
 }
 
-func Warn(v ...any) {
-	if instance != nil {
-		instance.warnLogger.Println(v...)
+func (l *Logger) Warnf(format string, v ...any) {
+	if l.warnLogger != nil {
+		l.warnLogger.Printf(format, v...)
 	}
 }
 
-func Warnf(format string, v ...any) {
-	if instance != nil {
-		instance.warnLogger.Printf(format, v...)
+func (l *Logger) Error(v ...any) {
+	if l.errorLogger != nil {
+		l.errorLogger.Println(v...)
 	}
 }
 
-func Error(v ...any) {
-	if instance != nil {
-		instance.errorLogger.Println(v...)
+func (l *Logger) Errorf(format string, v ...any) {
+	if l.errorLogger != nil {
+		l.errorLogger.Printf(format, v...)
 	}
 }
 
-func Errorf(format string, v ...any) {
-	if instance != nil {
-		instance.errorLogger.Printf(format, v...)
+func (l *Logger) Debug(v ...any) {
+	if l.debugLogger != nil {
+		l.debugLogger.Println(v...)
 	}
 }
 
-func Debug(v ...any) {
-	if instance != nil {
-		instance.debugLogger.Println(v...)
-	}
-}
-
-func Debugf(format string, v ...any) {
-	if instance != nil {
-		instance.debugLogger.Printf(format, v...)
+func (l *Logger) Debugf(format string, v ...any) {
+	if l.debugLogger != nil {
+		l.debugLogger.Printf(format, v...)
 	}
 }
