@@ -1,21 +1,20 @@
 package mail
 
 import (
+	"fmt"
 	"os"
 	"time"
 
 	"github.com/ryan-gang/kindle-send-daemon/internal/util"
 
-	"github.com/ryan-gang/kindle-send-daemon/internal/config"
-
 	gomail "gopkg.in/mail.v2"
 )
 
-func Send(files []string, timeout int) {
-	cfg := config.GetInstance()
+func (s *SMTPMailSender) Send(files []string, timeout int) error {
+	cfg := s.cfg
 	msg := gomail.NewMessage()
-	msg.SetHeader("From", cfg.Sender)
-	msg.SetHeader("To", cfg.Receiver)
+	msg.SetHeader("From", cfg.GetSender())
+	msg.SetHeader("To", cfg.GetReceiver())
 
 	msg.SetBody("text/plain", "")
 
@@ -23,7 +22,7 @@ func Send(files []string, timeout int) {
 	for _, file := range files {
 		_, err := os.Stat(file)
 		if err != nil {
-			util.Red.Printf("Couldn't find the file %s : %s \n", file, err)
+			util.LogErrorf(util.FileError, "accessing file", "couldn't find file %s", file)
 			continue
 		} else {
 			msg.Attach(file)
@@ -32,10 +31,10 @@ func Send(files []string, timeout int) {
 	}
 	if len(attachedFiles) == 0 {
 		util.Cyan.Println("No files to send")
-		return
+		return fmt.Errorf("no valid files to send")
 	}
 
-	dialer := gomail.NewDialer(cfg.Server, cfg.Port, cfg.Sender, cfg.Password)
+	dialer := gomail.NewDialer(cfg.GetServer(), cfg.GetPort(), cfg.GetSender(), cfg.GetPassword())
 	dialer.Timeout = time.Duration(timeout) * time.Second
 	util.CyanBold.Println("Sending mail")
 	util.Cyan.Println("Mail timeout : ", dialer.Timeout.String())
@@ -45,10 +44,10 @@ func Send(files []string, timeout int) {
 	}
 
 	if err := dialer.DialAndSend(msg); err != nil {
-		util.Red.Println("Error sending mail : ", err)
-		return
-	} else {
-		util.GreenBold.Printf("Mailed %d files to %s", len(attachedFiles), cfg.Receiver)
+		util.LogError(util.MailError, "sending mail", err)
+		return fmt.Errorf("failed to send mail: %w", err)
 	}
 
+	util.GreenBold.Printf("Mailed %d files to %s", len(attachedFiles), cfg.GetReceiver())
+	return nil
 }
