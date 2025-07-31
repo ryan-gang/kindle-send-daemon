@@ -18,7 +18,7 @@ func murmurHash64B(key []byte, seed uint64) (hash uint64) {
 
 	var l = len(key)
 	var h1 = uint32(seed) ^ uint32(l)
-	var h2 = uint32(seed) >> 32
+	var h2 = uint32(seed >> 32)
 
 	var data = key
 

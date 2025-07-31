@@ -23,10 +23,8 @@ Webpages are optimized for viewing on e-reader
 
 
 <p>
-<figure>
 <img width="90%" src="assets/toepub.png">
 <figcaption>Credits - Netflix tech blog<a href="https://netflixtechblog.com/fixing-performance-regressions-before-they-happen-eab2602b86fe">Fixing Performance Regressions Before they Happen</a></figcaption>
-</figure>
 </p>
 
 

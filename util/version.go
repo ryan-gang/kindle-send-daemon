@@ -26,8 +26,7 @@ func PrintVersion() {
 	fmt.Println("Platform: ", version.Platform)
 }
 func GetVersion() Version {
-	var versionStr string
-	versionStr = "v" + version
+	versionStr := "v" + version
 	return Version{
 		Version:   versionStr,
 		BuildDate: buildDate,
