@@ -30,42 +30,7 @@ type ProcessedState struct {
 	LastCheck time.Time           `json:"last_check"`
 }
 
-// FileProviderAdapter adapts the providers.FileProvider to the bookmarks.Provider interface
-type FileProviderAdapter struct {
-	provider *providers.FileProvider
-}
-
-func (fpa *FileProviderAdapter) Name() string {
-	return fpa.provider.Name()
-}
-
-func (fpa *FileProviderAdapter) IsEnabled() bool {
-	return fpa.provider.IsEnabled()
-}
-
-func (fpa *FileProviderAdapter) Configure(config map[string]interface{}) error {
-	return fpa.provider.Configure(config)
-}
-
-func (fpa *FileProviderAdapter) GetBookmarks(ctx context.Context) ([]bookmarks.Bookmark, error) {
-	providerBookmarks, err := fpa.provider.GetBookmarks(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	// Convert from providers.Bookmark to bookmarks.Bookmark
-	var bookmarkList []bookmarks.Bookmark
-	for _, pb := range providerBookmarks {
-		bookmarkList = append(bookmarkList, bookmarks.Bookmark{
-			URL:       pb.URL,
-			Title:     pb.Title,
-			Source:    pb.Source,
-			Timestamp: pb.Timestamp,
-		})
-	}
-
-	return bookmarkList, nil
-}
+// FileProviderAdapter is no longer needed - FileProvider implements bookmarks.Provider directly
 
 type BookmarkProcessor struct {
 	statePath string
@@ -82,15 +47,14 @@ func NewBookmarkProcessor() *BookmarkProcessor {
 
 	// Register file provider
 	fileProvider := providers.NewFileProvider()
-	fileAdapter := &FileProviderAdapter{provider: fileProvider}
-	registry.Register(fileAdapter)
+	registry.Register(fileProvider)
 
 	// Configure file provider if bookmark path is set
 	if cfg.BookmarkPath != "" {
 		providerConfig := map[string]interface{}{
 			"path": cfg.BookmarkPath,
 		}
-		fileAdapter.Configure(providerConfig)
+		fileProvider.Configure(providerConfig)
 	}
 
 	processor := &BookmarkProcessor{

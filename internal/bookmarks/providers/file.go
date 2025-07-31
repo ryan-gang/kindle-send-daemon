@@ -9,16 +9,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ryan-gang/kindle-send-daemon/internal/bookmarks"
 	"github.com/ryan-gang/kindle-send-daemon/internal/util"
 )
 
-type Bookmark struct {
-	URL       string    `json:"url"`
-	Title     string    `json:"title"`
-	Source    string    `json:"source"`
-	Timestamp time.Time `json:"timestamp"`
-}
-
+// FileProvider implements the Provider interface for file-based bookmarks
 type FileProvider struct {
 	path    string
 	enabled bool
@@ -49,7 +44,7 @@ func (fp *FileProvider) Configure(config map[string]interface{}) error {
 }
 
 // GetBookmarks retrieves bookmarks from the configured file or directory
-func (fp *FileProvider) GetBookmarks(ctx context.Context) ([]Bookmark, error) {
+func (fp *FileProvider) GetBookmarks(ctx context.Context) ([]bookmarks.Bookmark, error) {
 	if !fp.IsEnabled() {
 		return nil, fmt.Errorf("file provider is not enabled or configured")
 	}
@@ -59,7 +54,7 @@ func (fp *FileProvider) GetBookmarks(ctx context.Context) ([]Bookmark, error) {
 		return nil, fmt.Errorf("bookmark path does not exist: %v", err)
 	}
 
-	var allBookmarks []Bookmark
+	var allBookmarks []bookmarks.Bookmark
 
 	if info.IsDir() {
 		files, err := os.ReadDir(fp.path)
@@ -80,7 +75,7 @@ func (fp *FileProvider) GetBookmarks(ctx context.Context) ([]Bookmark, error) {
 			}
 
 			for _, url := range bookmarkURLs {
-				allBookmarks = append(allBookmarks, Bookmark{
+				allBookmarks = append(allBookmarks, bookmarks.Bookmark{
 					URL:       url,
 					Title:     "", // File provider doesn't have titles
 					Source:    fp.Name(),
@@ -95,7 +90,7 @@ func (fp *FileProvider) GetBookmarks(ctx context.Context) ([]Bookmark, error) {
 		}
 
 		for _, url := range bookmarkURLs {
-			allBookmarks = append(allBookmarks, Bookmark{
+			allBookmarks = append(allBookmarks, bookmarks.Bookmark{
 				URL:       url,
 				Title:     "", // File provider doesn't have titles
 				Source:    fp.Name(),
